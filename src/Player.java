@@ -2,6 +2,7 @@ import ui.*;
 
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class Player {
 
@@ -10,14 +11,14 @@ public class Player {
     AddSongWindow addWindow;
     private int numberSongs = 0;
 
-    ArrayList queue = new ArrayList<String[]>();
+    ArrayList<String[]> queue = new ArrayList<>();
     //String[][] queue = new String[10][7];
 
     public Player() {
 
         window = new PlayerWindow(
                 playButton,
-                placeholderListener,
+                buttonListenerRemove,
                 addSongButton,
                 placeholderListener,
                 placeholderListener,
@@ -46,6 +47,7 @@ public class Player {
     ActionListener addSongOk = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
+            numberSongs++;
             queue.add(addWindow.getSong());
             window.updateQueueList(getQueueArray());
             System.out.println("Nova musica Id: " + Integer.toString(numberSongs));
@@ -55,10 +57,26 @@ public class Player {
     ActionListener addSongButton = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            String songId = Integer.toString(numberSongs+1);
+            String songId = Integer.toString(numberSongs);
             addWindow = new AddSongWindow(songId, addSongOk, windowListener);
         }
     };
+
+    ActionListener buttonListenerRemove = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            numberSongs--;
+            int songID = window.getSelectedSongID();
+            System.out.println(songID);
+            for (int i = 0; i < queue.size(); i++){
+                 if(queue.get(i)[6].equals(""+songID))
+                     queue.remove(i);
+            }
+
+            window.updateQueueList(getQueueArray());
+        }
+    };
+
 
     ActionListener placeholderListener = new ActionListener() {
         @Override
