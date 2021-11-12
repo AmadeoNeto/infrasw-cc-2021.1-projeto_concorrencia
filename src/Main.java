@@ -1,5 +1,4 @@
-import ui.AddSongWindow;
-import ui.PlayerWindow;
+import ui.*;
 
 import java.awt.event.*;
 

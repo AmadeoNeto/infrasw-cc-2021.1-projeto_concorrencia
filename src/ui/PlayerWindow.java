@@ -37,7 +37,6 @@ public class PlayerWindow extends Thread {
      * @param scrubberListenerMotion  MouseMotionListener for the Scrubber.
      * @param windowTitle             String to be used as the window title.
      * @param queueArray              String[][] with the queue. The array should contain in each position one array
-     *                                from AddSongWindow.getSong().
      */
     public PlayerWindow(
             ActionListener buttonListenerPlayNow,

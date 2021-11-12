@@ -1,15 +1,21 @@
-import ui.AddSongWindow;
-import ui.PlayerWindow;
+import ui.*;
 
 import java.awt.event.*;
+import java.util.ArrayList;
 
 public class Player {
 
+    PlayerWindow window;
     WindowListener windowListener;
+    AddSongWindow addWindow;
+    private int numberSongs = 0;
+
+    ArrayList queue = new ArrayList<String[]>();
+    //String[][] queue = new String[10][7];
 
     public Player() {
 
-        PlayerWindow window = new PlayerWindow(
+        window = new PlayerWindow(
                 playButton,
                 placeholderListener,
                 addSongButton,
@@ -22,24 +28,35 @@ public class Player {
                 mouseListener,
                 motionListener,
                 "CIn Media Player",
-                new String[5][4]
+                //queue
+                getQueueArray()
         );
 
         windowListener = window.getAddSongWindowListener();
+
+    }
+
+    public String[][] getQueueArray() {
+        String[][] array = new String[queue.size()][7];
+        array = (String[][]) queue.toArray(array);
+        return array;
     }
 
     // Listeners
     ActionListener addSongOk = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            System.out.println("Musica adionada");
+            queue.add(addWindow.getSong());
+            window.updateQueueList(getQueueArray());
+            System.out.println("Nova musica Id: " + Integer.toString(numberSongs));
         }
     };
 
     ActionListener addSongButton = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            AddSongWindow addWindow = new AddSongWindow("465465", addSongOk, windowListener);
+            String songId = Integer.toString(numberSongs+1);
+            addWindow = new AddSongWindow(songId, addSongOk, windowListener);
         }
     };
 
