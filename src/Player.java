@@ -2,8 +2,8 @@ import ui.*;
 
 import java.awt.event.*;
 import java.util.ArrayList;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
 
@@ -22,18 +22,35 @@ public class Player {
 
     Thread windowsUpdater;
     Thread timerUpdater;
-    CyclicBarrier timerBarrier;
+
+    Lock timerLock = new ReentrantLock();
 
     Runnable increaseTimer = () ->{
-        try {
-            int totalTime = Integer.parseInt(currentSong[5]);
-            while(currentTime <= totalTime) {
-                Thread.sleep(1000);
-                timerBarrier.await();
-                currentTime++;
-            }
-        } catch (InterruptedException | BrokenBarrierException e) {
+        long currTime;    // Time from the current check
+        long prvTime;     // Time from the last check
+        long elapsedTime; // Time elapsed from the current to the last check
+        long timer;       // Counts how much time the music played
 
+        while(true) {
+            currentTime = 0;
+            timer = 0;
+
+            prvTime = System.currentTimeMillis(); // First check
+
+            while(isActive) {
+                timerLock.lock(); // Prevents inconsistencies with the time measured
+                currTime = System.currentTimeMillis();
+                elapsedTime = currTime - prvTime;
+
+                // If the music is not paused, add the elapsed time to the timer
+                if(isPlaying) {
+                    timer += elapsedTime;
+                    currentTime = (int) timer / 1000; // Update the shown time in seconds
+                }
+
+                prvTime = currTime; // The current time is the previous one for the next iteration
+                timerLock.unlock();
+            }
         }
     };
 
@@ -42,23 +59,15 @@ public class Player {
         int totalTime = Integer.parseInt(currentSong[5]);
 
         while(currentTime <= totalTime) {
-            try {
-                int await = timerBarrier.await();
-
-                if (await == 0) {
-                    window.updateMiniplayer(
-                            isActive,
-                            isPlaying,
-                            isRepeat,
-                            currentTime,
-                            totalTime,
-                            songID,
-                            queue.size()
-                    );
-                }
-            } catch (Exception e) {
-
-            }
+            window.updateMiniplayer(
+                    isActive,
+                    isPlaying,
+                    isRepeat,
+                    currentTime,
+                    totalTime,
+                    songID,
+                    queue.size()
+            );
         }
     };
 
@@ -169,7 +178,7 @@ public class Player {
             windowsUpdater = new Thread(updateWindow);
             timerUpdater = new Thread(increaseTimer);
 
-            timerBarrier = new CyclicBarrier(1);
+            //timerBarrier = new CyclicBarrier(1);
             windowsUpdater.start();
             timerUpdater.start();
         }
