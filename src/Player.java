@@ -17,6 +17,8 @@ public class Player {
     private boolean isRepeat = false;
     private int currentTime = 0;
     private int numberSongs = 0;
+    long timer;       // Counts how much time the current music played
+
 
     ArrayList<String[]> queue = new ArrayList<>();
 
@@ -29,9 +31,8 @@ public class Player {
         long currTime;    // Time from the current check
         long prvTime;     // Time from the last check
         long elapsedTime; // Time elapsed from the current to the last check
-        long timer;       // Counts how much time the music played
 
-        while(true) {
+        while(isActive) {
             currentTime = 0;
             timer = 0;
 
@@ -58,7 +59,7 @@ public class Player {
         int songID = Integer.parseInt(currentSong[6]);
         int totalTime = Integer.parseInt(currentSong[5]);
 
-        while(currentTime <= totalTime) {
+        while(isActive) {
             window.updateMiniplayer(
                     isActive,
                     isPlaying,
@@ -116,7 +117,11 @@ public class Player {
         @Override
         public void actionPerformed(ActionEvent e) {
             numberSongs++;
-            queue.add(addWindow.getSong());
+            try {
+                queue.add(addWindow.getSong());
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
             window.updateQueueList(getQueueArray());
             System.out.println("Nova musica Id: " + Integer.toString(numberSongs));
         }
@@ -137,8 +142,8 @@ public class Player {
             int songID = window.getSelectedSongID();
             System.out.println(songID);
             for (int i = 0; i < queue.size(); i++){
-                 if(queue.get(i)[6].equals(""+songID))
-                     queue.remove(i);
+                if(queue.get(i)[6].equals(""+songID))
+                    queue.remove(i);
             }
 
             window.updateQueueList(getQueueArray());
@@ -148,31 +153,38 @@ public class Player {
     ActionListener playNowListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            isPlaying = true;
-            isActive = true;
-            window.updatePlayPauseButton(true);
+            Thread t = new Thread(() -> {
+                isPlaying = true;
+                isActive = true;
+                window.updatePlayPauseButton(true);
 
-            int songID = window.getSelectedSongID();
-            currentSong = getMusicByID(songID);
-            currentTime = 0;
+                int songID = window.getSelectedSongID();
+                currentSong = getMusicByID(songID);
 
-            window.updateMiniplayer(
-                    true,
-                    true,
-                    isRepeat,
-                    currentTime,
-                    Integer.parseInt(currentSong[5]),
-                    songID,
-                    queue.size());
+                window.updateMiniplayer(
+                        true,
+                        true,
+                        isRepeat,
+                        0,
+                        Integer.parseInt(currentSong[5]),
+                        songID,
+                        queue.size());
 
-            window.enableScrubberArea();
+                window.enableScrubberArea();
 
-            windowsUpdater = new Thread(updateWindow);
-            timerUpdater = new Thread(increaseTimer);
+                if (timerUpdater != null) {
+                    timerUpdater.interrupt();
+                }
 
-            //timerBarrier = new CyclicBarrier(1);
-            windowsUpdater.start();
-            timerUpdater.start();
+                currentTime = 0;
+                timer = 0;
+                windowsUpdater = new Thread(updateWindow);
+                timerUpdater = new Thread(increaseTimer);
+
+                windowsUpdater.start();
+                timerUpdater.start();
+            });
+            t.start();
         }
     };
 

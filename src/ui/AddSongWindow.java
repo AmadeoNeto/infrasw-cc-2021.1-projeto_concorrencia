@@ -7,6 +7,8 @@ import javax.swing.text.MaskFormatter;
 import java.awt.*;
 import java.awt.event.*;
 import java.text.ParseException;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class AddSongWindow extends Thread {
 
@@ -16,6 +18,9 @@ public class AddSongWindow extends Thread {
     private boolean yearFirstFocus = false;
     private boolean addAlreadyPressed = false;
     private String[] song;
+
+    ReentrantLock lock = new ReentrantLock();
+    Condition songAdded = lock.newCondition();
 
     /**
      * Window to input information from a song to be added to the queue. The object with that information is returned
@@ -217,6 +222,11 @@ public class AddSongWindow extends Thread {
                                     songLength,
                                     songLengthSeconds,
                                     songID};
+
+                            lock.lock();
+                            songAdded.signalAll();
+                            lock.unlock();
+
                             buttonListenerAddSongOK.actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, null));
                             window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
                         } else {
@@ -266,9 +276,15 @@ public class AddSongWindow extends Thread {
      * [5] Song Length in seconds<br>
      * [6] Song ID
      */
-    public String[] getSong() {
+    public String[] getSong() throws InterruptedException {
         String[] newSong = new String[song.length];
+
+        while (song.length == 0){
+            songAdded.await();
+        }
+        lock.lock();
         System.arraycopy(song, 0, newSong, 0, song.length);
+        lock.unlock();
         return newSong;
     }
 
