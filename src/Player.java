@@ -77,14 +77,14 @@ public class Player {
                 playNowListener,
                 buttonListenerRemove,
                 addSongButton,
-                placeholderListener,
-                placeholderListener,
-                placeholderListener,
-                placeholderListener,
-                placeholderListener,
-                placeholderListener,
-                mouseListener,
-                motionListener,
+                buttonListenerPlayPause,
+                buttonListenerStop,
+                buttonListenerNext,
+                buttonListenerPrevious,
+                buttonListenerShuffle,
+                buttonListenerRepeat,
+                scrubberListenerClick,
+                scrubberListenerMotion,
                 "CIn Media Player",
                 getQueueArray()
         );
@@ -93,7 +93,7 @@ public class Player {
     }
 
     /**
-     * @return the queue as a array of songs (String[])
+     * @return the queue as an array of songs (String[])
      */
     public String[][] getQueueArray() {
         String[][] array = new String[queue.size()][7];
@@ -145,14 +145,6 @@ public class Player {
         }
     };
 
-
-    ActionListener placeholderListener = new ActionListener() {
-        @Override
-        public void actionPerformed(ActionEvent e) {
-
-        }
-    };
-
     ActionListener playNowListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -184,7 +176,54 @@ public class Player {
         }
     };
 
-    MouseListener mouseListener = new MouseListener() {
+    ActionListener buttonListenerPlayPause = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            isPlaying = !isPlaying;
+            window.updatePlayPauseButton(isPlaying);
+            System.out.println("Is Playing: " + isPlaying.toString());
+        }
+    };
+
+    ActionListener buttonListenerStop = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            isPlaying = false;
+            isActive = false;
+            window.resetMiniPlayer();
+            currentTime = 0;
+        }
+    };
+
+    ActionListener buttonListenerNext = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+        }
+    };
+
+    ActionListener buttonListenerPrevious = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+        }
+    };
+
+    ActionListener buttonListenerShuffle = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+        }
+    };
+
+    ActionListener buttonListenerRepeat = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+
+        }
+    };
+
+    MouseListener scrubberListenerClick = new MouseListener() {
         @Override
         public void mouseClicked(MouseEvent e) {
 
@@ -211,7 +250,7 @@ public class Player {
         }
     };
 
-    MouseMotionListener motionListener = new MouseMotionListener() {
+    MouseMotionListener scrubberListenerMotion = new MouseMotionListener() {
         @Override
         public void mouseDragged(MouseEvent e) {
 
@@ -222,4 +261,5 @@ public class Player {
 
         }
     };
+
 }
