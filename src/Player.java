@@ -27,38 +27,43 @@ public class Player {
     Thread windowsUpdater;
     Thread timerUpdater;
 
+    int playNowTimes = 0;
+    long killer = -1;
+
     Lock timerLock = new ReentrantLock();
 
     Runnable increaseTimer = () ->{
+        currentTime = 0;
+        long timer = 0;       // Counts how much time the current music played
+        long currTime;    // Time from the current check
+        long prvTime;     // Time from the last check
+        long elapsedTime; // Time elapsed from the current to the last check
 
-        while(isActive) {
-            currentTime = 0;
-            timer = 0;
+        int id = playNowTimes;
+        prvTime = System.currentTimeMillis(); // First check
 
-            prvTime = System.currentTimeMillis(); // First check
+        while(isActive && killer != id) {
+            timerLock.lock(); // Prevents inconsistencies with the time measured
+            currTime = System.currentTimeMillis();
+            elapsedTime = currTime - prvTime;
 
-            while(isActive) {
-                timerLock.lock(); // Prevents inconsistencies with the time measured
-                currTime = System.currentTimeMillis();
-                elapsedTime = currTime - prvTime;
-
-                // If the music is not paused, add the elapsed time to the timer
-                if(isPlaying) {
-                    timer += elapsedTime;
-                    currentTime = (int) timer / 1000; // Update the shown time in seconds
-                }
-
-                prvTime = currTime; // The current time is the previous one for the next iteration
-                timerLock.unlock();
+            // If the music is not paused, add the elapsed time to the timer
+            if(isPlaying) {
+                timer += elapsedTime;
+                currentTime = (int) timer / 1000; // Update the shown time in seconds
             }
+
+            prvTime = currTime; // The current time is the previous one for the next iteration
+            timerLock.unlock();
         }
     };
 
     Runnable updateWindow = () -> {
+        long id = playNowTimes;
         int songID = Integer.parseInt(currentSong[6]);
         int totalTime = Integer.parseInt(currentSong[5]);
 
-        while(isActive) {
+        while(isActive && killer != id) {
             window.updateMiniplayer(
                     isActive,
                     isPlaying,
@@ -158,7 +163,8 @@ public class Player {
     ActionListener playNowListener = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            Thread t = new Thread(() -> {
+            Thread playNowThread = new Thread(() -> {
+                playNowTimes++;
                 isPlaying = true;
                 isActive = true;
                 window.updatePlayPauseButton(true);
@@ -177,24 +183,19 @@ public class Player {
 
                 window.enableScrubberArea();
 
-                if (timerUpdater != null) {
-                    timerUpdater.interrupt();
-                }
+                killer = playNowTimes-1;
 
-                currentTime = 0;
-                timer = 0;
-                currTime = 0;
-                prvTime = 0;
-                elapsedTime =0;
                 windowsUpdater = new Thread(updateWindow);
                 timerUpdater = new Thread(increaseTimer);
 
                 windowsUpdater.start();
                 timerUpdater.start();
+
+                System.out.println("Play Times: "+Integer.toString(playNowTimes)+" Killer: " +Long.toString(killer));
             });
-            t.start();
+            playNowThread.start();
             try {
-                t.join();
+                playNowThread.join();
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }
