@@ -8,6 +8,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.util.Objects;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class MiniPlayerPanel extends JPanel {
 
@@ -27,6 +29,13 @@ public class MiniPlayerPanel extends JPanel {
     private final JLabel miniPlayerCurrentTime = new JLabel("- - : - -");
     private final JSlider miniPlayerScrubber = new JSlider();
     private final JLabel miniPlayerTotalTime = new JLabel("- - : - -");
+
+    // Concurrency Control Vars
+    private long miniplayerUpdatesCounter = 0;
+    private ReentrantLock timerLock = new ReentrantLock();
+    private Condition timerUpdated = timerLock.newCondition();
+
+    private Thread update;
 
     // TODO Sincronizar
     public MiniPlayerPanel(
@@ -153,26 +162,41 @@ public class MiniPlayerPanel extends JPanel {
             int totalTime,
             int songIndex,
             int queueSize) {
-        if (isActive) {
-            updatePlayPauseButton(isPlaying);
-            miniPlayerCurrentTime.setText(SecondsToString.currentTimeToString(currentTime, totalTime));
-            miniPlayerTotalTime.setText(SecondsToString.lengthToString(totalTime));
-            miniPlayerScrubber.setMaximum(totalTime);
-            miniPlayerScrubber.setValue(currentTime);
-            if (!isRepeat) {
-                miniPlayerPreviousButton.setEnabled(songIndex > 0);
-                miniPlayerNextButton.setEnabled(songIndex < queueSize - 1);
+        updatePlayPauseButton(isPlaying);
+        this.update = new Thread(() -> {
+            if (isActive) {
+                updatePlayPauseButton(isPlaying);
+                miniPlayerCurrentTime.setText(SecondsToString.currentTimeToString(currentTime, totalTime));
+                miniPlayerTotalTime.setText(SecondsToString.lengthToString(totalTime));
+                miniPlayerScrubber.setMaximum(totalTime);
+                miniPlayerScrubber.setValue(currentTime);
+                if (!isRepeat) {
+                    miniPlayerPreviousButton.setEnabled(songIndex > 0);
+                    miniPlayerNextButton.setEnabled(songIndex < queueSize - 1);
+                } else {
+                    miniPlayerPreviousButton.setEnabled(true);
+                    miniPlayerNextButton.setEnabled(true);
+                }
             } else {
-                miniPlayerPreviousButton.setEnabled(true);
-                miniPlayerNextButton.setEnabled(true);
+                resetMiniPlayer();
             }
-        } else {
-            resetMiniPlayer();
+        });
+        this.update.start();
+        try {
+            this.update.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
+
     }
 
     // TODO Sincronizar
     public void resetMiniPlayer() {
+        try {
+            this.update.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         miniPlayerCurrentTime.setText("- - : - -");
         miniPlayerTotalTime.setText("- - : - -");
         miniPlayerSongInfo.setText("");

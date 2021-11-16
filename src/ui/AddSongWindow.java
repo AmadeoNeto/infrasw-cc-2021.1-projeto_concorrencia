@@ -264,7 +264,8 @@ public class AddSongWindow extends Thread {
         window.setVisible(true);
     }
 
-    // TODO Sincronizar
+    // Sincronized: a thread that calls the GetSong method will not receive the result until the song has been properly
+    // created.
 
     /**
      * @return String array with the following information:<br>
@@ -282,9 +283,12 @@ public class AddSongWindow extends Thread {
         while (song.length == 0){
             songAdded.await();
         }
-        lock.lock();
-        System.arraycopy(song, 0, newSong, 0, song.length);
-        lock.unlock();
+        try {
+            lock.lock();
+            System.arraycopy(song, 0, newSong, 0, song.length);
+        } finally {
+            lock.unlock();
+        }
         return newSong;
     }
 

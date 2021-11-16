@@ -18,7 +18,9 @@ public class Player {
     private int currentTime = 0;
     private int numberSongs = 0;
     long timer;       // Counts how much time the current music played
-
+    long currTime;    // Time from the current check
+    long prvTime;     // Time from the last check
+    long elapsedTime; // Time elapsed from the current to the last check
 
     ArrayList<String[]> queue = new ArrayList<>();
 
@@ -28,9 +30,6 @@ public class Player {
     Lock timerLock = new ReentrantLock();
 
     Runnable increaseTimer = () ->{
-        long currTime;    // Time from the current check
-        long prvTime;     // Time from the last check
-        long elapsedTime; // Time elapsed from the current to the last check
 
         while(isActive) {
             currentTime = 0;
@@ -141,6 +140,12 @@ public class Player {
             numberSongs--;
             int songID = window.getSelectedSongID();
             System.out.println(songID);
+            if(currentSong[6].equals(""+songID)){
+                isPlaying = false;
+                isActive = false;
+                window.resetMiniPlayer();
+                currentTime = 0;
+            }
             for (int i = 0; i < queue.size(); i++){
                 if(queue.get(i)[6].equals(""+songID))
                     queue.remove(i);
@@ -178,6 +183,9 @@ public class Player {
 
                 currentTime = 0;
                 timer = 0;
+                currTime = 0;
+                prvTime = 0;
+                elapsedTime =0;
                 windowsUpdater = new Thread(updateWindow);
                 timerUpdater = new Thread(increaseTimer);
 
@@ -185,6 +193,11 @@ public class Player {
                 timerUpdater.start();
             });
             t.start();
+            try {
+                t.join();
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
         }
     };
 
@@ -200,11 +213,14 @@ public class Player {
     ActionListener buttonListenerStop = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            isPlaying = false;
-            isActive = false;
-            window.resetMiniPlayer();
-            currentTime = 0;
-        }
+            Thread stopThread = new Thread(() ->{
+                isPlaying = false;
+                isActive = false;
+                window.resetMiniPlayer();
+                currentTime = 0;
+            });
+            stopThread.start();
+        };
     };
 
     ActionListener buttonListenerNext = new ActionListener() {
