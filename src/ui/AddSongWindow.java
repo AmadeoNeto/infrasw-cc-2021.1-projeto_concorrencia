@@ -284,8 +284,8 @@ public class AddSongWindow extends Thread {
             songAdded.await(); // Put the calling thread to wait until the song end its creation
         }
 
+        lock.lock(); // Used to make sure that the song array will be copied without changes
         try {
-            lock.lock(); // Used to make sure that the song array will be copied without changes
             System.arraycopy(song, 0, newSong, 0, song.length);
         } finally {
             lock.unlock();

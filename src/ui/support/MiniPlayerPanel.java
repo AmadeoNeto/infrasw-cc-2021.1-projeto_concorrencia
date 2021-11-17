@@ -147,6 +147,8 @@ public class MiniPlayerPanel extends JPanel {
 
     // Sincronizado
     public void updatePlayPauseButton(boolean isPlaying) {
+
+        // Prevent changes in isPlaying while the playPause icon is updating, preventing inconsistencies
         lock.lock();
         try{
             miniPlayerPlayPauseButton.setIcon(isPlaying ? iconPause : iconPlay);
@@ -165,6 +167,8 @@ public class MiniPlayerPanel extends JPanel {
             int songIndex,
             int queueSize) {
         updatePlayPauseButton(isPlaying);
+
+        //Thread used to allow the reset run always after the update change the values of the UI objects
         this.update = new Thread(() -> {
             if (isActive) {
                 updatePlayPauseButton(isPlaying);
@@ -194,11 +198,14 @@ public class MiniPlayerPanel extends JPanel {
 
     // Sincronized
     public void resetMiniPlayer() {
+
+        // Ensures that the reset will run after the update, preventing the update to overwrite the reset values
         try {
             this.update.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
         miniPlayerCurrentTime.setText("- - : - -");
         miniPlayerTotalTime.setText("- - : - -");
         miniPlayerSongInfo.setText("");

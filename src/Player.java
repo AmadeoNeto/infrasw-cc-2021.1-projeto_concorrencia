@@ -39,8 +39,8 @@ public class Player {
         prvTime = System.currentTimeMillis(); // First check
 
         while(isActive && killer != id) {
+            timerLock.lock(); // lock used to prevent inconsistencies with the time measured
             try {
-                timerLock.lock(); // lock used to prevent inconsistencies with the time measured
                 currTime = System.currentTimeMillis();
                 elapsedTime = currTime - prvTime;
 
