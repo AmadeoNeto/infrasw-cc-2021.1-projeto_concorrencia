@@ -17,10 +17,6 @@ public class Player {
     private boolean isRepeat = false;
     private int currentTime = 0;
     private int numberSongs = 0;
-    long timer;       // Counts how much time the current music played
-    long currTime;    // Time from the current check
-    long prvTime;     // Time from the last check
-    long elapsedTime; // Time elapsed from the current to the last check
 
     ArrayList<String[]> queue = new ArrayList<>();
 
@@ -77,6 +73,12 @@ public class Player {
     };
 
     public Player() {
+        String musica[] = {"titulo","albym","artista","5004","10:20","620","0"};
+        for (int i = 0; i < 1000; i++) {
+            musica[0] = "titulo " + i;
+            musica[6] = Integer.toString(i);
+            queue.add(musica.clone());
+        }
 
         window = new PlayerWindow(
                 playNowListener,
@@ -93,7 +95,6 @@ public class Player {
                 "CIn Media Player",
                 getQueueArray()
         );
-
         windowListener = window.getAddSongWindowListener();
     }
 
@@ -145,7 +146,7 @@ public class Player {
             numberSongs--;
             int songID = window.getSelectedSongID();
             System.out.println(songID);
-            if(currentSong[6].equals(""+songID)){
+            if(currentSong != null && currentSong[6].equals(""+songID)){
                 isPlaying = false;
                 isActive = false;
                 window.resetMiniPlayer();
@@ -180,6 +181,8 @@ public class Player {
                         Integer.parseInt(currentSong[5]),
                         songID,
                         queue.size());
+
+                window.updatePlayingSongInfo(currentSong[0], currentSong[1], currentSong[2]);
 
                 window.enableScrubberArea();
 

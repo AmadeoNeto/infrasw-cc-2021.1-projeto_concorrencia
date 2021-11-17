@@ -31,10 +31,7 @@ public class MiniPlayerPanel extends JPanel {
     private final JLabel miniPlayerTotalTime = new JLabel("- - : - -");
 
     // Concurrency Control Vars
-    private long miniplayerUpdatesCounter = 0;
-    private ReentrantLock timerLock = new ReentrantLock();
-    private Condition timerUpdated = timerLock.newCondition();
-
+    private ReentrantLock lock = new ReentrantLock();
     private Thread update;
 
     // TODO Sincronizar
@@ -132,12 +129,12 @@ public class MiniPlayerPanel extends JPanel {
 
     // TODO Sincronizar
     public void enableScrubberArea() {
-        miniPlayerPreviousButton.setEnabled(true);
-        miniPlayerPlayPauseButton.setEnabled(true);
-        miniPlayerStopButton.setEnabled(true);
-        miniPlayerNextButton.setEnabled(true);
-        miniPlayerScrubber.setEnabled(true);
-    }
+             miniPlayerPreviousButton.setEnabled(true);
+             miniPlayerPlayPauseButton.setEnabled(true);
+             miniPlayerStopButton.setEnabled(true);
+             miniPlayerNextButton.setEnabled(true);
+             miniPlayerScrubber.setEnabled(true);
+         }
 
     // TODO Sincronizar
     public void disableScrubberArea() {
@@ -148,12 +145,17 @@ public class MiniPlayerPanel extends JPanel {
         miniPlayerScrubber.setEnabled(false);
     }
 
-    // TODO Sincronizar
+    // Sincronizado
     public void updatePlayPauseButton(boolean isPlaying) {
-        miniPlayerPlayPauseButton.setIcon(isPlaying ? iconPause : iconPlay);
+        lock.lock();
+        try{
+            miniPlayerPlayPauseButton.setIcon(isPlaying ? iconPause : iconPlay);
+        }finally {
+            lock.unlock();
+        }
     }
 
-    // TODO Sincronizar
+    // Sincronizado
     public void updateMiniplayer(
             boolean isActive,
             boolean isPlaying,
@@ -190,7 +192,7 @@ public class MiniPlayerPanel extends JPanel {
 
     }
 
-    // TODO Sincronizar
+    //  Sincronizado
     public void resetMiniPlayer() {
         try {
             this.update.join();
