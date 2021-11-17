@@ -192,7 +192,7 @@ public class MiniPlayerPanel extends JPanel {
 
     }
 
-    //  Sincronizado
+    // Sincronized
     public void resetMiniPlayer() {
         try {
             this.update.join();

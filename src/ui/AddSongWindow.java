@@ -19,8 +19,8 @@ public class AddSongWindow extends Thread {
     private boolean addAlreadyPressed = false;
     private String[] song;
 
-    ReentrantLock lock = new ReentrantLock();
-    Condition songAdded = lock.newCondition();
+    ReentrantLock lock = new ReentrantLock();  // Lock to prevent the GetSong be called before the song is created
+    Condition songAdded = lock.newCondition(); // Condition that indicates when the song is created
 
     /**
      * Window to input information from a song to be added to the queue. The object with that information is returned
@@ -224,7 +224,7 @@ public class AddSongWindow extends Thread {
                                     songID};
 
                             lock.lock();
-                            songAdded.signalAll();
+                            songAdded.signalAll(); // Indicates that the song was created
                             lock.unlock();
 
                             buttonListenerAddSongOK.actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, null));
@@ -281,10 +281,11 @@ public class AddSongWindow extends Thread {
         String[] newSong = new String[song.length];
 
         while (song.length == 0){
-            songAdded.await();
+            songAdded.await(); // Put the calling thread to wait until the song end its creation
         }
+
         try {
-            lock.lock();
+            lock.lock(); // Used to make sure that the song array will be copied without changes
             System.arraycopy(song, 0, newSong, 0, song.length);
         } finally {
             lock.unlock();
