@@ -13,6 +13,7 @@ import java.awt.event.MouseMotionListener;
 import java.awt.event.WindowListener;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PlayerWindow extends Thread {
 
@@ -20,6 +21,8 @@ public class PlayerWindow extends Thread {
     private final JPanel mainPanel;
     private final QueuePanel queuePanel;
     private final MiniPlayerPanel miniPlayerPanel;
+    private ReentrantLock lock = new ReentrantLock();
+
 
     // TODO Sincronizar
 
@@ -57,20 +60,26 @@ public class PlayerWindow extends Thread {
 
         window = new JFrame();
         mainPanel = new JPanel();
-        queuePanel = new QueuePanel(
-                buttonListenerPlayNow,
-                buttonListenerRemove,
-                buttonListenerAddSong,
-                queueArray);
-        miniPlayerPanel = new MiniPlayerPanel(
-                buttonListenerPlayPause,
-                buttonListenerStop,
-                buttonListenerNext,
-                buttonListenerPrevious,
-                buttonListenerShuffle,
-                buttonListenerRepeat,
-                scrubberListenerClick,
-                scrubberListenerMotion);
+
+        lock.lock(); // Ensure that the panels will be safely constructed
+        try{
+            queuePanel = new QueuePanel(
+                    buttonListenerPlayNow,
+                    buttonListenerRemove,
+                    buttonListenerAddSong,
+                    queueArray);
+            miniPlayerPanel = new MiniPlayerPanel(
+                    buttonListenerPlayPause,
+                    buttonListenerStop,
+                    buttonListenerNext,
+                    buttonListenerPrevious,
+                    buttonListenerShuffle,
+                    buttonListenerRepeat,
+                    scrubberListenerClick,
+                    scrubberListenerMotion);
+        } finally{
+            lock.unlock();
+        }
 
         window.setLayout(new BorderLayout());
         window.setTitle(windowTitle);
@@ -83,8 +92,10 @@ public class PlayerWindow extends Thread {
         mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+
         mainPanel.add(queuePanel);
         mainPanel.add(miniPlayerPanel);
+
         window.add(mainPanel);
         window.setVisible(true);
     }
