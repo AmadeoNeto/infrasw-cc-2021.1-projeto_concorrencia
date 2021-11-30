@@ -1,5 +1,6 @@
 import ui.*;
 
+import javax.swing.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
@@ -26,7 +27,8 @@ public class Player {
     int playNowTimes = 0; // How many times the Play Now button was pressed
     long killer = -1;  // Used to kill threads with the id stored in this
 
-    Lock timerLock = new ReentrantLock(); // Lock used to keep the consistence during the time measurement
+    Lock lock = new ReentrantLock(); // Lock used to evict race conditions in the use of class attributes
+    Lock timerLock = new ReentrantLock(); //Lock used to keep the consistence in the time measurement
 
     Runnable increaseTimer = () ->{
         currentTime = 0;
@@ -76,24 +78,26 @@ public class Player {
     };
 
     public Player() {
+        SwingUtilities.invokeLater(() -> {
+            window = new PlayerWindow(
+                    playNowListener,
+                    buttonListenerRemove,
+                    addSongButton,
+                    buttonListenerPlayPause,
+                    buttonListenerStop,
+                    buttonListenerNext,
+                    buttonListenerPrevious,
+                    buttonListenerShuffle,
+                    buttonListenerRepeat,
+                    scrubberListenerClick,
+                    scrubberListenerMotion,
+                    "CIn Media Player",
+                    getQueueArray()
+            );
 
-        window = new PlayerWindow(
-                playNowListener,
-                buttonListenerRemove,
-                addSongButton,
-                buttonListenerPlayPause,
-                buttonListenerStop,
-                buttonListenerNext,
-                buttonListenerPrevious,
-                buttonListenerShuffle,
-                buttonListenerRepeat,
-                scrubberListenerClick,
-                scrubberListenerMotion,
-                "CIn Media Player",
-                getQueueArray()
-        );
-        windowListener = window.getAddSongWindowListener();
-        numberSongs = queue.size();
+            windowListener = window.getAddSongWindowListener();
+            numberSongs = queue.size();
+        });
     }
 
     /**
@@ -118,11 +122,14 @@ public class Player {
     ActionListener addSongOk = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            numberSongs++;
             try {
+                lock.lock(); // Lock used to evict race condition with the var numberSongs and the queue
+                numberSongs++;
                 queue.add(addWindow.getSong());
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
+            }finally {
+                lock.unlock();
             }
             window.updateQueueList(getQueueArray());
         }
@@ -131,31 +138,43 @@ public class Player {
     ActionListener addSongButton = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            String songId = Integer.toString(numberSongs);
-            addWindow = new AddSongWindow(songId, addSongOk, windowListener);
+            SwingUtilities.invokeLater(() -> {
+                String songId = Integer.toString(numberSongs);
+                addWindow = new AddSongWindow(songId, addSongOk, windowListener);
+            });
         }
     };
 
     ActionListener buttonListenerRemove = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            numberSongs--;
-            int songID = window.getSelectedSongID();
+            // Due to the remove operation been relatively intense, a thread is necessary to not freeze the EDT
+            Thread removerThread = new Thread(() -> {
+                try {
+                    // Lock used to keep the consistence in the numberSongs decrement and the control variables of the class
+                    lock.lock();
+                    numberSongs--;
+                    int songID = window.getSelectedSongID();
 
-            // If the current song will be removed, stop playing it
-            if(currentSong != null && currentSong[6].equals(""+songID)){
-                isPlaying = false;
-                isActive = false;
-                window.resetMiniPlayer();
-                currentTime = 0;
-            }
-            // Seek the music that will be removed in the queue by id and remove it
-            for (int i = 0; i < queue.size(); i++){
-                if(queue.get(i)[6].equals(""+songID))
-                    queue.remove(i);
-            }
+                    // If the current song will be removed, stop playing it
+                    if (currentSong != null && currentSong[6].equals("" + songID)) {
+                        isPlaying = false;
+                        isActive = false;
+                        window.resetMiniPlayer();
+                        currentTime = 0;
+                    }
+                    // Seek the music that will be removed in the queue by id and r e
 
-            window.updateQueueList(getQueueArray());
+                    for (int i = 0; i < queue.size(); i++) {
+                        if (queue.get(i)[6].equals("" + songID))
+                            queue.remove(i);
+                    }
+                } finally {
+                    lock.unlock();
+                }
+                window.updateQueueList(getQueueArray());
+            });
+            removerThread.start();
         }
     };
 
@@ -164,13 +183,18 @@ public class Player {
         public void actionPerformed(ActionEvent e) {
             // A thread is necessary to run "in parallel" with EDT to prevent it to freeze
             Thread playNowThread = new Thread(() -> {
-                playNowTimes++;
-                isPlaying = true;
-                isActive = true;
-                window.updatePlayPauseButton(true);
+                try{
+                    lock.lock(); // Evicts race condition in the above class variables
+                    playNowTimes++;
+                    isPlaying = true;
+                    isActive = true;
+                    window.updatePlayPauseButton(true);
 
-                int songID = window.getSelectedSongID();
-                currentSong = getMusicByID(songID);
+                    int songID = window.getSelectedSongID();
+                    currentSong = getMusicByID(songID);
+                } finally {
+                    lock.unlock();
+                }
 
                 window.updateMiniplayer(
                         true,
@@ -178,7 +202,8 @@ public class Player {
                         isRepeat,
                         0,
                         Integer.parseInt(currentSong[5]),
-                        songID,
+                        Integer.parseInt(currentSong[6]),
+                        //songID,
                         queue.size());
 
                 window.updatePlayingSongInfo(currentSong[0], currentSong[1], currentSong[2]);
@@ -186,7 +211,12 @@ public class Player {
                 window.enableScrubberArea();
 
                 // Kill the previous song updater threads
-                killer = playNowTimes-1;
+                try {
+                    lock.lock(); // Evicts inconsistencies with the killer variable
+                    killer = playNowTimes - 1;
+                } finally {
+                    lock.unlock();
+                }
 
                 // Initialize the threads that will update the info of the current playing song
                 windowsUpdater = new Thread(updateWindow);
@@ -209,8 +239,13 @@ public class Player {
     ActionListener buttonListenerPlayPause = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            isPlaying = !isPlaying;
-            window.updatePlayPauseButton(isPlaying);
+            try {
+                lock.lock(); // Lock to evict inconsistencies with the isPlaying and in the pause GUI button
+                isPlaying = !isPlaying;
+                window.updatePlayPauseButton(isPlaying);
+            } finally {
+                lock.unlock();
+            }
         }
     };
 
@@ -219,10 +254,15 @@ public class Player {
         public void actionPerformed(ActionEvent e) {
             // A thread is necessary to run "in parallel" with EDT to prevent it to freeze
             Thread stopThread = new Thread(() ->{
-                isPlaying = false;
-                isActive = false;
-                window.resetMiniPlayer();
-                currentTime = 0;
+                try {
+                    lock.lock(); // Lock to evict inconsistencies with class attributes
+                    isPlaying = false;
+                    isActive = false;
+                    window.resetMiniPlayer();
+                    currentTime = 0;
+                } finally {
+                    lock.unlock();
+                }
             });
             stopThread.start();
         };
