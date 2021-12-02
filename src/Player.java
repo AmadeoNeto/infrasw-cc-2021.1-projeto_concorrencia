@@ -3,6 +3,8 @@ import ui.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -23,12 +25,14 @@ public class Player {
 
     Thread windowsUpdater; // Thread used to update the window values "in parallel" with the rest of the program
     Thread timerUpdater;   // Thread used to update the current time "in parallel" with the rest program
+    Thread songFinishedChecker;   // Thread used to check if the next music should be played
 
     long killer = -1;  // Used to kill threads with the id stored in this
     long playedSongs =  -1;
 
     Lock lock = new ReentrantLock(); // Lock used to evict race conditions in the use of class attributes
     Lock timerLock = new ReentrantLock(); //Lock used to keep the consistence in the time measurement
+    Condition songFinishedCondition = timerLock.newCondition();
 
     Runnable increaseTimer = () ->{
         currentTime = 0;
@@ -37,7 +41,6 @@ public class Player {
         long prvTime;     // Time from the last check
         long elapsedTime; // Time elapsed from the current to the last check
         int musicLength = Integer.parseInt(currentSong[5]);
-        System.out.println(musicLength);
 
         long id = playedSongs;
         prvTime = System.currentTimeMillis(); // First check
@@ -54,6 +57,11 @@ public class Player {
                     currentTime = (int) timer / 1000; // Update the shown time in seconds
                 }
                 prvTime = currTimeMilis; // The current time is the previous one for the next iteration
+
+                if(currentTime >= musicLength){
+                    songFinishedCondition.signal();
+                    return;
+                }
             } finally{
                 timerLock.unlock();
             }
@@ -75,6 +83,21 @@ public class Player {
                     songID,
                     queue.size()
             );
+        }
+    };
+
+    Runnable finishChecker = () ->{
+        int musicLength = Integer.parseInt(currentSong[5]);
+        while(currentTime <= musicLength) {
+            try {
+                timerLock.lock();
+                songFinishedCondition.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                timerLock.unlock();
+            }
+            next();
         }
     };
 
@@ -156,25 +179,12 @@ public class Player {
             // Initialize the threads that will update the info of the current playing song
             windowsUpdater = new Thread(updateWindow);
             timerUpdater = new Thread(increaseTimer);
-
-            if(windowsUpdater != null){
-                try {
-                    windowsUpdater.join();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            if(timerUpdater != null){
-                try {
-                    timerUpdater.join();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
+            songFinishedChecker = new Thread(finishChecker);
 
             windowsUpdater.start();
+            System.out.println(timerUpdater.getState());
             timerUpdater.start();
+            songFinishedChecker.start();
         });
         playNewThread.start();
     }
