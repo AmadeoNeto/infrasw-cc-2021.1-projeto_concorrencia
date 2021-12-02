@@ -3,7 +3,6 @@ import ui.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.ArrayList;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -18,6 +17,7 @@ public class Player {
     private Boolean isPlaying = false;
     private boolean isActive = false;
     private boolean isRepeat = false;
+    private boolean isHoldingScrubber = false;
     private int currentTime = 0; // The time that the current song played in seconds
     private int numberSongs = 0;
 
@@ -33,13 +33,14 @@ public class Player {
     Lock lock = new ReentrantLock(); // Lock used to evict race conditions in the use of class attributes
     Lock timerLock = new ReentrantLock(); //Lock used to keep the consistence in the time measurement
     Condition songFinishedCondition = timerLock.newCondition();
+    Condition scrubberReleasedCondition = timerLock.newCondition();
 
     Runnable increaseTimer = () ->{
         currentTime = 0;
-        long timer = 0;   // Counts how much time the current music played
-        long currTimeMilis;    // Time from the current check
-        long prvTime;     // Time from the last check
-        long elapsedTime; // Time elapsed from the current to the last check
+        long timer = 0;      // Counts how much time the current music played
+        long currTimeMilis; // Time from the current check
+        long prvTime;       // Time from the last check
+        long elapsedTime;   // Time elapsed from the current to the last check
         int musicLength = Integer.parseInt(currentSong[5]);
 
         long id = playedSongs;
@@ -48,6 +49,15 @@ public class Player {
         while(isActive && killer != id) {
             timerLock.lock(); // lock used to prevent inconsistencies with the time measured
             try {
+                while (isHoldingScrubber){
+                    try {
+                        scrubberReleasedCondition.await();
+                        timer = (long) currentTime * 1000;
+                        prvTime = System.currentTimeMillis();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
                 currTimeMilis = System.currentTimeMillis();
                 elapsedTime = currTimeMilis - prvTime;
 
@@ -58,7 +68,7 @@ public class Player {
                 }
                 prvTime = currTimeMilis; // The current time is the previous one for the next iteration
 
-                if(currentTime >= musicLength){
+                if (currentTime >= musicLength) {
                     songFinishedCondition.signal();
                     return;
                 }
@@ -88,17 +98,17 @@ public class Player {
 
     Runnable finishChecker = () ->{
         int musicLength = Integer.parseInt(currentSong[5]);
-        while(currentTime <= musicLength) {
-            try {
-                timerLock.lock();
+        try {
+            timerLock.lock();
+            while(currentTime < musicLength) {
                 songFinishedCondition.await();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } finally {
-                timerLock.unlock();
             }
-            next();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            timerLock.unlock();
         }
+        next();
     };
 
     public Player() {
@@ -182,7 +192,6 @@ public class Player {
             songFinishedChecker = new Thread(finishChecker);
 
             windowsUpdater.start();
-            System.out.println(timerUpdater.getState());
             timerUpdater.start();
             songFinishedChecker.start();
         });
@@ -348,12 +357,23 @@ public class Player {
 
         @Override
         public void mousePressed(MouseEvent e) {
-
+            try {
+                timerLock.lock();
+                isHoldingScrubber = true;
+            } finally {
+                timerLock.unlock();
+            }
         }
 
         @Override
         public void mouseReleased(MouseEvent e) {
-
+            try {
+                timerLock.lock();
+                isHoldingScrubber = false;
+                scrubberReleasedCondition.signalAll();
+            } finally {
+                timerLock.unlock();
+            }
         }
 
         @Override
@@ -370,7 +390,13 @@ public class Player {
     MouseMotionListener scrubberListenerMotion = new MouseMotionListener() {
         @Override
         public void mouseDragged(MouseEvent e) {
-
+            try{
+                lock.lock();
+                System.out.println(window.getScrubberValue());
+                currentTime = window.getScrubberValue();
+            } finally {
+                lock.unlock();
+            }
         }
 
         @Override
