@@ -23,15 +23,14 @@ public class Player {
 
     ArrayList<String[]> queue = new ArrayList<>();
 
-    Thread windowsUpdater; // Thread used to update the window values "in parallel" with the rest of the program
-    Thread timerUpdater;   // Thread used to update the current time "in parallel" with the rest program
-    Thread songFinishedChecker;   // Thread used to check if the next music should be played
+    Thread windowsUpdater;       // Thread used to update the window values "in parallel" with the rest of the program
+    Thread timerUpdater;         // Thread used to update the current time "in parallel" with the rest program
+    Thread songFinishedChecker;  // Thread used to check if the next music should be played
 
-    long killer = -1;  // Used to kill threads with the id stored in this
-    long playedSongs =  -1;
+    long killer = -1;       // Used to kill threads with the id stored in this
+    long playedSongs = -1;  // Counts how many songs were played. Is used to kill threads
 
     Lock lock = new ReentrantLock(); // Lock used to evict race conditions in the use of class attributes
-    //Lock timerLock = new ReentrantLock(); //Lock used to keep the consistence in the time measurement
     Condition songFinishedCondition = lock.newCondition();
     Condition scrubberReleasedCondition = lock.newCondition();
 
@@ -49,11 +48,12 @@ public class Player {
         while(isActive && killer != id) {
             lock.lock(); // lock used to prevent inconsistencies with the time measured
             try {
+                // If it is holding the scrubber, wait until it is released
                 while (isHoldingScrubber){
                     try {
                         scrubberReleasedCondition.await();
-                        timer = (long) currentTime * 1000;
-                        prvTime = System.currentTimeMillis();
+                        timer = (long) currentTime * 1000;    // Updates the timer using the scrubber time
+                        prvTime = System.currentTimeMillis(); // First time checking after the scrubber was released
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -68,8 +68,9 @@ public class Player {
                 }
                 prvTime = currTimeMilis; // The current time is the previous one for the next iteration
 
+                // If the music finished, call the finish checker and kill this thread
                 if (currentTime >= musicLength) {
-                    songFinishedCondition.signalAll();
+                    songFinishedCondition.signalAll(); // Condition used to indicate that the song ended
                     return;
                 }
             } finally{
@@ -83,6 +84,7 @@ public class Player {
         int songID = Integer.parseInt(currentSong[6]);
         int totalTime = Integer.parseInt(currentSong[5]);
 
+        // Local variables that will receive values from the critical region
         boolean _isActive = isActive;
         int   _currentTime;
         boolean _isPlaying;
@@ -90,7 +92,7 @@ public class Player {
 
         while(_isActive && killer != id) {
             try {
-                lock.lock();
+                lock.lock(); // Lock used to read values from the critical region
                 _currentTime = currentTime;
                 _isActive = isActive;
                 _isPlaying = isPlaying;
@@ -120,6 +122,7 @@ public class Player {
         long id = playedSongs;
         try {
             lock.lock();
+            // Await a song finish and then try to play the next one.
             while(currentTime < musicLength) {
                 songFinishedCondition.await();
             }
@@ -128,10 +131,10 @@ public class Player {
         } finally {
             lock.unlock();
         }
-        System.out.println("Ola mundo");
 
+        // Prevents a previous execution from this thread mess with the system
         if(killer < id) {
-            next();
+            next(); // Play the next song
         }
     };
 
@@ -203,7 +206,7 @@ public class Player {
 
             // Kill the previous song updater threads
             try {
-                lock.lock(); // Evicts inconsistencies with the killer variable
+                lock.lock(); // Evicts inconsistencies with class variables
                 playedSongs++;
                 killer = playedSongs-1;
             } finally {
@@ -240,15 +243,13 @@ public class Player {
 
     public void next(){
         try {
-            lock.lock();
+            lock.lock(); // Used to get the right value of currentSong and of the queue
             int nextSongIndex = queue.indexOf(currentSong) + 1;
 
             if (nextSongIndex < queue.size()) {
                 playNewSong(queue.get(nextSongIndex));
-                System.out.println(queue.get(nextSongIndex)[0]);
             } else {
                 stopPlaying();
-                System.out.println("nao ha mais musicas");
             }
         } finally {
             lock.unlock();
@@ -387,12 +388,12 @@ public class Player {
 
         @Override
         public void mousePressed(MouseEvent e) {
+            // Run if the user does a simple click on the scrubber
             int scrubberValue =  window.getScrubberValue();
             try {
-                lock.lock();
+                lock.lock(); // Used to set the above variables without concur with the timer update
                 isHoldingScrubber = true;
                 currentTime = scrubberValue;
-                System.out.println("pressionado " + window.getScrubberValue()+ " " + currentTime);
             } finally {
                 lock.unlock();
             }
@@ -400,12 +401,10 @@ public class Player {
 
         @Override
         public void mouseReleased(MouseEvent e) {
-            System.out.println("mouse liberado");
             try {
-                lock.lock();
+                lock.lock(); // Used to set the value of isHoldingScrubber correctly
                 isHoldingScrubber = false;
-                System.out.println("released " + window.getScrubberValue() + " " + currentTime);
-                scrubberReleasedCondition.signalAll();
+                scrubberReleasedCondition.signalAll(); // Signal threads that are waiting for this condition
             } finally {
                 lock.unlock();
             }
@@ -426,8 +425,7 @@ public class Player {
         @Override
         public void mouseDragged(MouseEvent e) {
             try{
-                lock.lock();
-                System.out.println(window.getScrubberValue());
+                lock.lock(); // Evict race condition with the timer thread
                 currentTime = window.getScrubberValue();
             } finally {
                 lock.unlock();
