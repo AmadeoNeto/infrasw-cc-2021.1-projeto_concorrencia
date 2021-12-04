@@ -31,9 +31,9 @@ public class Player {
     long playedSongs =  -1;
 
     Lock lock = new ReentrantLock(); // Lock used to evict race conditions in the use of class attributes
-    Lock timerLock = new ReentrantLock(); //Lock used to keep the consistence in the time measurement
-    Condition songFinishedCondition = timerLock.newCondition();
-    Condition scrubberReleasedCondition = timerLock.newCondition();
+    //Lock timerLock = new ReentrantLock(); //Lock used to keep the consistence in the time measurement
+    Condition songFinishedCondition = lock.newCondition();
+    Condition scrubberReleasedCondition = lock.newCondition();
 
     Runnable increaseTimer = () ->{
         currentTime = 0;
@@ -47,7 +47,7 @@ public class Player {
         prvTime = System.currentTimeMillis(); // First check
 
         while(isActive && killer != id) {
-            timerLock.lock(); // lock used to prevent inconsistencies with the time measured
+            lock.lock(); // lock used to prevent inconsistencies with the time measured
             try {
                 while (isHoldingScrubber){
                     try {
@@ -73,7 +73,7 @@ public class Player {
                     return;
                 }
             } finally{
-                timerLock.unlock();
+                lock.unlock();
             }
         }
     };
@@ -83,12 +83,31 @@ public class Player {
         int songID = Integer.parseInt(currentSong[6]);
         int totalTime = Integer.parseInt(currentSong[5]);
 
-        while(isActive && killer != id) {
+        boolean _isActive = isActive;
+        int   _currentTime;
+        boolean _isPlaying;
+        boolean _isRepeat;
+
+        while(_isActive && killer != id) {
+            try {
+                lock.lock();
+                _currentTime = currentTime;
+                _isActive = isActive;
+                _isPlaying = isPlaying;
+                _isRepeat = isRepeat;
+            } finally {
+                lock.unlock();
+            }
+            if(!_isActive){
+                window.resetMiniPlayer();
+                break;
+            }
+
             window.updateMiniplayer(
-                    isActive,
-                    isPlaying,
-                    isRepeat,
-                    currentTime,
+                    _isActive,
+                    _isPlaying,
+                    _isRepeat,
+                    _currentTime,
                     totalTime,
                     songID,
                     queue.size()
@@ -99,14 +118,14 @@ public class Player {
     Runnable finishChecker = () ->{
         int musicLength = Integer.parseInt(currentSong[5]);
         try {
-            timerLock.lock();
+            lock.lock();
             while(currentTime < musicLength) {
                 songFinishedCondition.await();
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
-            timerLock.unlock();
+            lock.unlock();
         }
         next();
     };
@@ -352,27 +371,31 @@ public class Player {
     MouseListener scrubberListenerClick = new MouseListener() {
         @Override
         public void mouseClicked(MouseEvent e) {
-
         }
 
         @Override
         public void mousePressed(MouseEvent e) {
+            int scrubberValue =  window.getScrubberValue();
             try {
-                timerLock.lock();
+                lock.lock();
                 isHoldingScrubber = true;
+                currentTime = scrubberValue;
+                System.out.println("pressionado " + window.getScrubberValue()+ " " + currentTime);
             } finally {
-                timerLock.unlock();
+                lock.unlock();
             }
         }
 
         @Override
         public void mouseReleased(MouseEvent e) {
+            System.out.println("mouse liberado");
             try {
-                timerLock.lock();
+                lock.lock();
                 isHoldingScrubber = false;
+                System.out.println("released " + window.getScrubberValue() + " " + currentTime);
                 scrubberReleasedCondition.signalAll();
             } finally {
-                timerLock.unlock();
+                lock.unlock();
             }
         }
 
