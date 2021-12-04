@@ -69,7 +69,7 @@ public class Player {
                 prvTime = currTimeMilis; // The current time is the previous one for the next iteration
 
                 if (currentTime >= musicLength) {
-                    songFinishedCondition.signal();
+                    songFinishedCondition.signalAll();
                     return;
                 }
             } finally{
@@ -117,6 +117,7 @@ public class Player {
 
     Runnable finishChecker = () ->{
         int musicLength = Integer.parseInt(currentSong[5]);
+        long id = playedSongs;
         try {
             lock.lock();
             while(currentTime < musicLength) {
@@ -127,7 +128,11 @@ public class Player {
         } finally {
             lock.unlock();
         }
-        next();
+        System.out.println("Ola mundo");
+
+        if(killer < id) {
+            next();
+        }
     };
 
     public Player() {
@@ -234,12 +239,19 @@ public class Player {
         }
 
     public void next(){
-        int nextSongIndex = queue.indexOf(currentSong) + 1;
+        try {
+            lock.lock();
+            int nextSongIndex = queue.indexOf(currentSong) + 1;
 
-        if(nextSongIndex < queue.size()){
-            playNewSong(queue.get(nextSongIndex));
-        } else{
-            stopPlaying();
+            if (nextSongIndex < queue.size()) {
+                playNewSong(queue.get(nextSongIndex));
+                System.out.println(queue.get(nextSongIndex)[0]);
+            } else {
+                stopPlaying();
+                System.out.println("nao ha mais musicas");
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
