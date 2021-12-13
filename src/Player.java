@@ -3,6 +3,8 @@ import ui.*;
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,6 +27,8 @@ public class Player {
 
     ArrayList<String[]> queue = new ArrayList<>();
     ArrayList<String[]> bkp_queue = new ArrayList<>();
+
+    Map<Integer,Integer> shuffledIndex;
 
     Thread windowsUpdater;       // Thread used to update the window values "in parallel" with the rest of the program
     Thread timerUpdater;         // Thread used to update the current time "in parallel" with the rest program
@@ -294,13 +298,20 @@ public class Player {
             try {
                 lock.lock(); // Lock used to evict race condition with the var numberSongs and the queue
                 numberSongs++;
-                queue.add(addWindow.getSong());
+                String[] song = addWindow.getSong();
+                queue.add(song);
+                bkp_queue.add(song);
+                if(isShuffling){
+                    shuffledIndex.put(queue.size()-1,queue.size()-1);
+                }
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }finally {
                 lock.unlock();
             }
             window.updateQueueList(getQueueArray());
+
+
         }
     };
 
@@ -334,10 +345,22 @@ public class Player {
                     }
                     // Seek the music that will be removed in the queue by id and r e
 
+                    int removedIndex = -1;
                     for (int i = 0; i < queue.size(); i++) {
                         if (queue.get(i)[6].equals("" + songID))
                             queue.remove(i);
+                            removedIndex = i;
                     }
+
+                    if (isShuffling){
+                        int bkpRemoveIndex = shuffledIndex.get(removedIndex);
+                        for (int i = 0; i < bkp_queue.size(); i++) {
+                            if(bkp_queue.get(i)[6].equals(bkpRemoveIndex+"")){
+                                bkp_queue.remove(i);
+                            }
+                        }
+                    }
+
                 } finally {
                     lock.unlock();
                 }
@@ -397,6 +420,7 @@ public class Player {
                 lock.lock();
                 try {
                     isShuffling = !isShuffling;
+                    shuffledIndex = new HashMap<Integer,Integer>();
                 } finally {
                     lock.unlock();
                 }
@@ -416,6 +440,7 @@ public class Player {
                         if(currentSong != null){
                             String[] firstElement = currentSong.clone();
                             firstElement[6] = "0";
+                            shuffledIndex.put(0,Integer.parseInt(currentSong[0]));
                             shufledQueue.add(firstElement);
                             indexes.remove((Integer) Integer.parseInt(currentSong[6]));
                             forLoops -= 1;
@@ -427,12 +452,11 @@ public class Player {
                             indexes.remove((Integer) randomIndex);
 
                             String[] randomSong = queue.get(randomIndex).clone();
-
-
-                            randomSong[6] = (shufledQueue.size()) +"";
+                            int newId = shufledQueue.size();
+                            shuffledIndex.put(newId,Integer.parseInt(randomSong[6]));
+                            randomSong[6] = newId +"";
                             shufledQueue.add(randomSong);
                         }
-
                         bkp_queue = (ArrayList<String[]>) queue.clone();
                         queue = shufledQueue;
                     } finally {
