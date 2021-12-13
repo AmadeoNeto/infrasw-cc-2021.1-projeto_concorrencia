@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.Random;
 
 public class Player {
 
@@ -17,11 +18,13 @@ public class Player {
     private Boolean isPlaying = false;
     private boolean isActive = false;
     private boolean isRepeat = false;
+    private boolean isShuffling = false;
     private boolean isHoldingScrubber = false;
     private int currentTime = 0; // The time that the current song played in seconds
     private int numberSongs = 0;
 
     ArrayList<String[]> queue = new ArrayList<>();
+    ArrayList<String[]> bkp_queue = new ArrayList<>();
 
     Thread windowsUpdater;       // Thread used to update the window values "in parallel" with the rest of the program
     Thread timerUpdater;         // Thread used to update the current time "in parallel" with the rest program
@@ -120,12 +123,15 @@ public class Player {
     Runnable finishChecker = () ->{
         int musicLength = Integer.parseInt(currentSong[5]);
         long id = playedSongs;
+        String[] _currentSong = null;
+
         try {
             lock.lock();
             // Await a song finish and then try to play the next one.
             while(currentTime < musicLength) {
                 songFinishedCondition.await();
             }
+            _currentSong = currentSong;
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
@@ -134,7 +140,7 @@ public class Player {
 
         // Prevents a previous execution from this thread mess with the system
         if(killer < id) {
-            next(); // Play the next song
+            next(); // Play next song
         }
     };
 
@@ -249,7 +255,11 @@ public class Player {
             if (nextSongIndex < queue.size()) {
                 playNewSong(queue.get(nextSongIndex));
             } else {
-                stopPlaying();
+                if(isRepeat ){
+                    playNewSong(queue.get(0));
+                } else{
+                    stopPlaying();
+                }
             }
         } finally {
             lock.unlock();
@@ -257,10 +267,23 @@ public class Player {
     }
 
     public void back(){
-        int prvSongIndex = queue.indexOf(currentSong) - 1;
+        int prvSongIndex;
+        int last_song_index;
+        boolean _isRepeat;
+
+        lock.lock();
+        try {
+            prvSongIndex = queue.indexOf(currentSong) - 1;
+            last_song_index = queue.size() - 1;
+            _isRepeat = isRepeat;
+        } finally {
+            lock.unlock();
+        }
 
         if(prvSongIndex >= 0){
             playNewSong(queue.get(prvSongIndex));
+        } else if (_isRepeat) {
+            playNewSong(queue.get(last_song_index));
         }
     }
 
@@ -370,14 +393,75 @@ public class Player {
     ActionListener buttonListenerShuffle = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
+            Thread shuffleThread = new Thread(() -> {
+                lock.lock();
+                try {
+                    isShuffling = !isShuffling;
+                } finally {
+                    lock.unlock();
+                }
 
+                if (isShuffling){
+                    Random random = new Random();
+                    ArrayList<String[]> shufledQueue = new ArrayList<String[]>();
+                    ArrayList<Integer> indexes = new ArrayList<>();
+
+                    for (int i = 0; i < queue.size(); i++) {
+                        indexes.add(i);
+                    }
+
+                    lock.lock();
+                    try{
+                        int forLoops = queue.size();
+                        if(currentSong != null){
+                            String[] firstElement = currentSong.clone();
+                            firstElement[6] = "0";
+                            shufledQueue.add(firstElement);
+                            indexes.remove((Integer) Integer.parseInt(currentSong[6]));
+                            forLoops -= 1;
+                        }
+
+                        for (int i = 0; i < forLoops; i++) {
+                            int randomNum = random.nextInt(indexes.size());
+                            int randomIndex = indexes.get(randomNum);
+                            indexes.remove((Integer) randomIndex);
+
+                            String[] randomSong = queue.get(randomIndex).clone();
+
+
+                            randomSong[6] = (shufledQueue.size()) +"";
+                            shufledQueue.add(randomSong);
+                        }
+
+                        bkp_queue = (ArrayList<String[]>) queue.clone();
+                        queue = shufledQueue;
+                    } finally {
+                        lock.unlock();
+                    }
+                } else {
+                    lock.lock();
+                    try {
+                        queue = (ArrayList<String[]>) bkp_queue.clone();
+                    } finally {
+                        lock.unlock();
+                    }
+                }
+
+                window.updateQueueList(getQueueArray());
+            });
+            shuffleThread.start();
         }
     };
 
     ActionListener buttonListenerRepeat = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-
+            lock.lock();
+            try {
+                isRepeat = !isRepeat;
+            } finally {
+                lock.unlock();
+            }
         }
     };
 
