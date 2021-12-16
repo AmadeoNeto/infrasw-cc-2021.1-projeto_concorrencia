@@ -347,17 +347,24 @@ public class Player {
 
                     int removedIndex = -1;
                     for (int i = 0; i < queue.size(); i++) {
-                        if (queue.get(i)[6].equals("" + songID))
+                        if (queue.get(i)[6].equals("" + songID)){
                             queue.remove(i);
                             removedIndex = i;
+                        }
                     }
 
                     if (isShuffling){
+                        shuffledIndex.forEach((key, value) -> System.out.println(key + " = " + value));
+
                         int bkpRemoveIndex = shuffledIndex.get(removedIndex);
+
+                        removedIndex = -1;
                         for (int i = 0; i < bkp_queue.size(); i++) {
-                            if(bkp_queue.get(i)[6].equals(bkpRemoveIndex+"")){
+                            if (bkp_queue.get(i)[6].equals("" + bkpRemoveIndex)) {
                                 bkp_queue.remove(i);
+                                break;
                             }
+                            removedIndex = i;
                         }
                     }
 
@@ -440,7 +447,7 @@ public class Player {
                         if(currentSong != null){
                             String[] firstElement = currentSong.clone();
                             firstElement[6] = "0";
-                            shuffledIndex.put(0,Integer.parseInt(currentSong[0]));
+                            shuffledIndex.put(0,Integer.parseInt(currentSong[6]));
                             shufledQueue.add(firstElement);
                             indexes.remove((Integer) Integer.parseInt(currentSong[6]));
                             forLoops -= 1;
@@ -454,6 +461,7 @@ public class Player {
                             String[] randomSong = queue.get(randomIndex).clone();
                             int newId = shufledQueue.size();
                             shuffledIndex.put(newId,Integer.parseInt(randomSong[6]));
+
                             randomSong[6] = newId +"";
                             shufledQueue.add(randomSong);
                         }
