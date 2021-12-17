@@ -25,10 +25,10 @@ public class Player {
     private int currentTime = 0; // The time that the current song played in seconds
     private int numberSongs = 0;
 
-    ArrayList<String[]> queue = new ArrayList<>();
-    ArrayList<String[]> bkp_queue = new ArrayList<>();
+    ArrayList<String[]> queue = new ArrayList<>();     // Current playing playlists
+    ArrayList<String[]> bkp_queue = new ArrayList<>(); // Playlist used as a backup from the original to shuffle op.
 
-    Map<Integer,Integer> shuffledIndex;
+    Map<Integer,Integer> shuffledIndex; // Dict to help to the remove during shuffle: ShuffledIndex -> Original List
 
     Thread windowsUpdater;       // Thread used to update the window values "in parallel" with the rest of the program
     Thread timerUpdater;         // Thread used to update the current time "in parallel" with the rest program
@@ -348,7 +348,6 @@ public class Player {
                         isActive = false;
                         window.resetMiniPlayer();
                         currentTime = 0;
-                        System.out.println("Era a atual");
                     }
                     // Seek the music that will be removed in the queue by id and r e
 
@@ -360,18 +359,17 @@ public class Player {
                         }
                     }
 
+                    // If the playlist is shuffled, also removes the song from the backup playlist
                     if (isShuffling){
-                        shuffledIndex.forEach((key, value) -> System.out.println(key + " = " + value));
-
+                        // The procedure is the same as in the above remove, but getting the id from the song on the
+                        // backup playlist
                         int bkpRemoveIndex = shuffledIndex.get(removedIndex);
 
-                        removedIndex = -1;
                         for (int i = 0; i < bkp_queue.size(); i++) {
                             if (bkp_queue.get(i)[6].equals("" + bkpRemoveIndex)) {
                                 bkp_queue.remove(i);
                                 break;
                             }
-                            removedIndex = i;
                         }
                     }
 
@@ -430,8 +428,9 @@ public class Player {
     ActionListener buttonListenerShuffle = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
+            // Thread used to prevent the operation to freeze the EDT
             Thread shuffleThread = new Thread(() -> {
-                lock.lock();
+                lock.lock(); // Lock used to avoid race condition in changing class variables
                 try {
                     isShuffling = !isShuffling;
                     shuffledIndex = new HashMap<Integer,Integer>();
@@ -441,16 +440,18 @@ public class Player {
 
                 if (isShuffling){
                     Random random = new Random();
-                    ArrayList<String[]> shufledQueue = new ArrayList<String[]>();
-                    ArrayList<Integer> indexes = new ArrayList<>();
+                    ArrayList<String[]> shufledQueue = new ArrayList<String[]>(); // The shuffled playlist
+                    ArrayList<Integer> indexes = new ArrayList<>(); // The indexes of the songs that was not chosen
 
                     for (int i = 0; i < queue.size(); i++) {
                         indexes.add(i);
                     }
 
-                    lock.lock();
+                    lock.lock(); // Lock used to prevent the playlist been modified during the shuffling
                     try{
                         int forLoops = queue.size();
+
+                        // If there is a song playing, make it continue playing and put it at the start of the playlist
                         if(currentSong != null){
                             String[] firstElement = currentSong.clone();
                             firstElement[6] = "0";
@@ -463,9 +464,10 @@ public class Player {
 
                         for (int i = 0; i < forLoops; i++) {
                             int randomNum = random.nextInt(indexes.size());
-                            int randomIndex = indexes.get(randomNum);
+                            int randomIndex = indexes.get(randomNum); // The index of the chosen song from the playlist
                             indexes.remove((Integer) randomIndex);
 
+                            // Get the song using the random index and give to it the same id as the playlist size
                             String[] randomSong = queue.get(randomIndex).clone();
                             int newId = shufledQueue.size();
                             shuffledIndex.put(newId,Integer.parseInt(randomSong[6]));
@@ -473,13 +475,14 @@ public class Player {
                             randomSong[6] = newId +"";
                             shufledQueue.add(randomSong);
                         }
-                        bkp_queue = (ArrayList<String[]>) queue.clone();
-                        queue = shufledQueue;
+                        bkp_queue = (ArrayList<String[]>) queue.clone(); // Store the original playlist as a backup
+                        queue = shufledQueue; // Make the current played playlist be the shuffled one
                     } finally {
                         lock.unlock();
                     }
+                // If the playlist is shuffled, make it return to the original playlist
                 } else {
-                    lock.lock();
+                    lock.lock(); // Lock used to avoid that the queue be modified during the playlist restoration
                     try {
                         queue = (ArrayList<String[]>) bkp_queue.clone();
                     } finally {
@@ -487,7 +490,7 @@ public class Player {
                     }
                 }
 
-                window.updateQueueList(getQueueArray());
+                window.updateQueueList(getQueueArray()); // Update the playlist shown in the window
             });
             shuffleThread.start();
         }
@@ -496,7 +499,7 @@ public class Player {
     ActionListener buttonListenerRepeat = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            lock.lock();
+            lock.lock(); // Lock used to avoid race condition when changing the value of isRepeat
             try {
                 isRepeat = !isRepeat;
             } finally {
