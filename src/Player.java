@@ -254,7 +254,17 @@ public class Player {
     public void next(){
         try {
             lock.lock(); // Used to get the right value of currentSong and of the queue
-            int nextSongIndex = queue.indexOf(currentSong) + 1;
+
+            int nextSongIndex = -1;
+            for (int i = 0; i < queue.size(); i++) {
+                if (queue.get(i)[6].equals(currentSong[6])) {
+                     nextSongIndex = i + 1;
+                }
+            }
+            //int nextSongIndex = queue.indexOf(currentSong) + 1;
+            System.out.println("Next-1: " + (nextSongIndex-1));
+            System.out.println("Current Song :" + currentSong[6]);
+            System.out.println("Next Song: " + nextSongIndex);
 
             if (nextSongIndex < queue.size()) {
                 playNewSong(queue.get(nextSongIndex));
