@@ -261,10 +261,6 @@ public class Player {
                      nextSongIndex = i + 1;
                 }
             }
-            //int nextSongIndex = queue.indexOf(currentSong) + 1;
-            System.out.println("Next-1: " + (nextSongIndex-1));
-            System.out.println("Current Song :" + currentSong[6]);
-            System.out.println("Next Song: " + nextSongIndex);
 
             if (nextSongIndex < queue.size()) {
                 playNewSong(queue.get(nextSongIndex));
@@ -352,6 +348,7 @@ public class Player {
                         isActive = false;
                         window.resetMiniPlayer();
                         currentTime = 0;
+                        System.out.println("Era a atual");
                     }
                     // Seek the music that will be removed in the queue by id and r e
 
@@ -457,6 +454,7 @@ public class Player {
                         if(currentSong != null){
                             String[] firstElement = currentSong.clone();
                             firstElement[6] = "0";
+                            currentSong[6] = "0";
                             shuffledIndex.put(0,Integer.parseInt(currentSong[6]));
                             shufledQueue.add(firstElement);
                             indexes.remove((Integer) Integer.parseInt(currentSong[6]));
